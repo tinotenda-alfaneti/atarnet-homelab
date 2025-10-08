@@ -17,6 +17,12 @@ pipeline {
       }
     }
 
+    stage('Checkout') {
+        steps {
+            checkout scm
+        }
+    }
+
     stage('Install kubectl') {
       steps {
         sh '''
