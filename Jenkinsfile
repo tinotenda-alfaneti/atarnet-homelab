@@ -66,48 +66,55 @@ pipeline {
     }
 
     stage('Build & Push with Kaniko') {
-      steps {
-        script {
-          sh '''
-            echo "🚀 Building and pushing image with Kaniko..."
+        steps {
+            script {
+            sh '''
+                echo "🚀 Building and pushing image with Kaniko..."
 
-            cat <<EOF > kaniko.yaml
-            apiVersion: v1
-            kind: Pod
-            metadata:
-              name: kaniko-build
-            spec:
-              serviceAccountName: kaniko-builder
-              restartPolicy: Never
-              containers:
-                - name: kaniko
-                  image: gcr.io/kaniko-project/executor:latest
-                  args:
-                    - "--dockerfile=Dockerfile"
-                    - "--context=git://github.com/tinotenda-alfaneti/atarnet-homelab.git"
-                    - "--destination=${IMAGE_NAME}:${TAG}"
-                    - "--cleanup"
-                  volumeMounts:
+                cat <<EOF > kaniko.yaml
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                name: kaniko-build
+                spec:
+                serviceAccountName: kaniko-builder
+                restartPolicy: Never
+                containers:
+                    - name: kaniko
+                    image: gcr.io/kaniko-project/executor:latest
+                    args:
+                        - "--dockerfile=Dockerfile"
+                        - "--context=git://github.com/tinotenda-alfaneti/atarnet-homelab.git"
+                        - "--destination=${IMAGE_NAME}:${TAG}"
+                        - "--cleanup"
+                    volumeMounts:
+                        - name: docker-config
+                        mountPath: /kaniko/.docker/
+                volumes:
                     - name: docker-config
-                      mountPath: /kaniko/.docker/
-              volumes:
-                - name: docker-config
-                  projected:
-                    sources:
-                      - secret:
-                          name: dockerhub-creds
-                          items:
-                            - key: .dockerconfigjson
-                              path: config.json
-            EOF
+                    projected:
+                        sources:
+                        - secret:
+                            name: dockerhub-creds
+                            items:
+                                - key: .dockerconfigjson
+                                path: config.json
+                EOF
 
-            kubectl apply -f kaniko.yaml -n githubservices
-            kubectl wait --for=condition=complete pod/kaniko-build -n githubservices --timeout=10m
-            kubectl logs pod/kaniko-build -n githubservices
-            kubectl delete pod/kaniko-build -n githubservices
-          '''
+                echo "📦 Applying Kaniko build pod..."
+                kubectl apply -f kaniko.yaml -n githubservices
+
+                echo "⏳ Waiting for Kaniko build to complete..."
+                kubectl wait --for=condition=complete pod/kaniko-build -n githubservices --timeout=10m
+
+                echo "📋 Kaniko build logs:"
+                kubectl logs pod/kaniko-build -n githubservices || true
+
+                echo "🧹 Cleaning up Kaniko pod..."
+                kubectl delete pod/kaniko-build -n githubservices --ignore-not-found=true
+            '''
+            }
         }
-      }
     }
   } 
 
