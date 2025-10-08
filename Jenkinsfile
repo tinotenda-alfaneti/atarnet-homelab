@@ -20,7 +20,7 @@ pipeline {
     stage('Install kubectl') {
       steps {
         sh '''
-          echo "📦 Installing kubectl for correct architecture..."
+          echo "Installing kubectl for correct architecture..."
 
           ARCH=$(uname -m)
           case "$ARCH" in
@@ -45,7 +45,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
           sh '''
-            echo "🔍 Testing connection to Kubernetes cluster..."
+            echo "Testing connection to Kubernetes cluster..."
             
             mkdir -p $WORKSPACE/.kube
             cp "$KUBECONFIG_FILE" $WORKSPACE/.kube/config
@@ -69,49 +69,19 @@ pipeline {
         steps {
             script {
             sh '''
-                echo "🚀 Building and pushing image with Kaniko..."
+                echo "Launching Kaniko Job..."
 
-                cat <<EOF > kaniko.yaml
-                apiVersion: v1
-                kind: Pod
-                metadata:
-                name: kaniko-build
-                spec:
-                serviceAccountName: kaniko-builder
-                restartPolicy: Never
-                containers:
-                    - name: kaniko
-                    image: gcr.io/kaniko-project/executor:latest
-                    args:
-                        - "--dockerfile=Dockerfile"
-                        - "--context=git://github.com/tinotenda-alfaneti/atarnet-homelab.git"
-                        - "--destination=${IMAGE_NAME}:${TAG}"
-                        - "--cleanup"
-                    volumeMounts:
-                        - name: docker-config
-                        mountPath: /kaniko/.docker/
-                volumes:
-                    - name: docker-config
-                    projected:
-                        sources:
-                        - secret:
-                            name: dockerhub-creds
-                            items:
-                                - key: .dockerconfigjson
-                                path: config.json
-                EOF
+                kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
+                kubectl apply -f k8s/kaniko.yaml -n githubservices
 
-                echo "📦 Applying Kaniko build pod..."
-                kubectl apply -f kaniko.yaml -n githubservices
+                echo "Waiting for Kaniko Job to complete..."
+                kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
 
-                echo "⏳ Waiting for Kaniko build to complete..."
-                kubectl wait --for=condition=complete pod/kaniko-build -n githubservices --timeout=10m
+                echo "Kaniko Job logs:"
+                kubectl logs job/kaniko-job -n githubservices --all-containers || true
 
-                echo "📋 Kaniko build logs:"
-                kubectl logs pod/kaniko-build -n githubservices || true
-
-                echo "🧹 Cleaning up Kaniko pod..."
-                kubectl delete pod/kaniko-build -n githubservices --ignore-not-found=true
+                echo "Cleaning up Kaniko Job..."
+                kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
             '''
             }
         }
@@ -126,7 +96,7 @@ pipeline {
       echo "❌ BUILD FAILED"
     }
     always {
-      echo "🧽 Cleaning up workspace..."
+      echo "Cleaning up workspace..."
       cleanWs()
     }
   }
