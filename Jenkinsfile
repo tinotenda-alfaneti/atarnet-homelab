@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = "tinotendaalfaneti/atarnet-homelab" // Docker Hub repo
+    IMAGE_NAME = "tinorodney/atarnet-homelab" // Docker Hub repo
     TAG = "latest"
     KUBECONFIG_CRED = 'kubeconfigglobal'
     PATH = "$WORKSPACE/bin:$PATH"
