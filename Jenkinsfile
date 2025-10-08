@@ -65,6 +65,13 @@ pipeline {
       }
     }
 
+    stage('Debug Workspace') {
+      steps {
+        sh 'ls -R $WORKSPACE'
+      }
+    }
+
+
     stage('Build & Push with Kaniko') {
       steps {
         withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
@@ -74,7 +81,7 @@ pipeline {
               echo "Launching Kaniko Job..."
               kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
               # Apply your Kaniko job YAML here
-              kubectl apply -f k8s/kaniko.yaml -n githubservices
+              kubectl apply -f $WORKSPACE/k8s/kaniko.yaml -n githubservices
               kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
               kubectl logs job/kaniko-job -n githubservices
             '''
