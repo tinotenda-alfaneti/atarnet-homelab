@@ -9,17 +9,10 @@ pipeline {
   }
 
   stages {
-    stage('Prepare Workspace') {
-      steps {
-        echo "🧹 Cleaning workspace..."
-        cleanWs()
-        sh 'mkdir -p $WORKSPACE/bin'
-      }
-    }
-
     stage('Checkout') {
         steps {
-            checkout scm
+           checkout scm
+           sh 'mkdir -p $WORKSPACE/bin'
         }
     }
 
