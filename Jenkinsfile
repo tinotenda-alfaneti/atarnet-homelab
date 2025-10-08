@@ -74,7 +74,7 @@ pipeline {
               echo "Launching Kaniko Job..."
               kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
               # Apply your Kaniko job YAML here
-              kubectl apply -f kaniko-job.yaml -n githubservices
+              kubectl apply -f k8s/kaniko.yaml -n githubservices
               kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
               kubectl logs job/kaniko-job -n githubservices
             '''
