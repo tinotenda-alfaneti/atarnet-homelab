@@ -66,25 +66,21 @@ pipeline {
     }
 
     stage('Build & Push with Kaniko') {
-        steps {
-            script {
+      steps {
+        withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
+          script {
             sh '''
-                echo "Launching Kaniko Job..."
-
-                kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
-                kubectl apply -f k8s/kaniko.yaml -n githubservices
-
-                echo "Waiting for Kaniko Job to complete..."
-                kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
-
-                echo "Kaniko Job logs:"
-                kubectl logs job/kaniko-job -n githubservices --all-containers || true
-
-                echo "Cleaning up Kaniko Job..."
-                kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
+              export KUBECONFIG=$KUBECONFIG_FILE
+              echo "Launching Kaniko Job..."
+              kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
+              # Apply your Kaniko job YAML here
+              kubectl apply -f kaniko-job.yaml -n githubservices
+              kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
+              kubectl logs job/kaniko-job -n githubservices
             '''
-            }
+          }
         }
+      }
     }
   } 
 
