@@ -164,8 +164,16 @@ pipeline {
       echo "❌ BUILD FAILED."
     }
     always {
-      echo "🧹 Cleaning workspace..."
-      cleanWs()
+       echo "🧹 Cleaning up Kubernetes jobs..."
+            withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
+              sh '''
+                export KUBECONFIG=$KUBECONFIG_FILE
+                kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
+                kubectl delete job trivy-scan -n githubservices --ignore-not-found=true
+                echo "✅ Kubernetes jobs cleaned up."
+              '''
+            }
+            cleanWs()
     }
   }
 }
