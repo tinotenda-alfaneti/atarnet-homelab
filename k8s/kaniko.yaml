@@ -13,7 +13,7 @@ spec:
           args:
             - "--dockerfile=Dockerfile"
             - "--context=git://github.com/tinotenda-alfaneti/atarnet-homelab.git"
-            - "--destination=tinotendaalfaneti/atarnet-homelab:latest"
+            - "--destination=tinorodney/atarnet-homelab:latest"
             - "--verbosity=info"
             - "--cleanup"
           volumeMounts:

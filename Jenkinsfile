@@ -2,7 +2,8 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = "tinorodney/atarnet-homelab"
+
+    IMAGE_NAME = "tinorodney/atarnet-homelab" // Docker Hub repo
     TAG = "latest"
     KUBECONFIG_CRED = 'kubeconfigglobal'
     PATH = "$WORKSPACE/bin:$PATH"
@@ -10,10 +11,10 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      steps {
-        checkout scm
-        sh 'mkdir -p $WORKSPACE/bin'
-      }
+        steps {
+           checkout scm
+           sh 'mkdir -p $WORKSPACE/bin'
+        }
     }
 
     stage('Install Tools') {
@@ -52,16 +53,27 @@ pipeline {
       }
     }
 
-    stage('Build & Push Image with Kaniko') {
+    stage('Debug Workspace') {
+      steps {
+        sh 'ls -R $WORKSPACE'
+      }
+    }
+
+
+    stage('Build & Push with Kaniko') {
       steps {
         withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
-          sh '''
-            export KUBECONFIG=$KUBECONFIG_FILE
-            kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
-            kubectl apply -f $WORKSPACE/k8s/kaniko.yaml -n githubservices
-            kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
-            kubectl logs job/kaniko-job -n githubservices
-          '''
+          script {
+            sh '''
+              export KUBECONFIG=$KUBECONFIG_FILE
+              echo "Launching Kaniko Job..."
+              kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
+              # Apply your Kaniko job YAML here
+              kubectl apply -f $WORKSPACE/k8s/kaniko.yaml -n githubservices
+              kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
+              kubectl logs job/kaniko-job -n githubservices
+            '''
+          }
         }
       }
     }
