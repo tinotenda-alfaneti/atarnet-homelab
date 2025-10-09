@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: trivy-scan
+  namespace: githubservices
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trivy
+          image: aquasec/trivy:latest
+          args:
+            [
+              "image",
+              "--severity",
+              "HIGH,CRITICAL",
+              "--no-progress",
+              "tinorodney/atarnet-homelab:latest"
+            ]

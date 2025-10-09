@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atarnet-homelab.fullname" . }}
+  labels:
+    app: {{ include "atarnet-homelab.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "atarnet-homelab.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "atarnet-homelab.name" . }}
+    spec:
+      containers:
+        - name: {{ include "atarnet-homelab.name" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080

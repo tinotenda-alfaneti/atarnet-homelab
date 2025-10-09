@@ -1,0 +1,22 @@
+replicaCount: 1
+
+image:
+  repository: tinorodney/atarnet-homelab
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: hello.atarnet.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
