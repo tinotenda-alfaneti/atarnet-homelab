@@ -127,12 +127,30 @@ pipeline {
     stage('Fetch App Logs') {
       steps {
         withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
-          sh '''
-            export KUBECONFIG=$KUBECONFIG_FILE
-            echo "🪵 Fetching logs from app..."
-            POD=$($WORKSPACE/bin/kubectl get pods -n githubservices -l app=atarnet-homelab -o jsonpath="{.items[0].metadata.name}")
-            $WORKSPACE/bin/kubectl logs $POD -n githubservices || true
-          '''
+          script {
+            sh '''
+              export KUBECONFIG=$KUBECONFIG_FILE
+              echo "🪵 Waiting for pod to be ready before fetching logs..."
+
+              # Wait for pod readiness
+              ATTEMPTS=0
+              until kubectl get pods -n githubservices -l app=atarnet-homelab -o jsonpath="{.items[0].status.phase}" | grep -qE 'Running|Succeeded'; do
+                ATTEMPTS=$((ATTEMPTS+1))
+                if [ $ATTEMPTS -gt 30 ]; then
+                  echo "❌ Pod did not reach running state in time."
+                  kubectl get pods -n githubservices -l app=atarnet-homelab
+                  exit 1
+                fi
+                echo "⏳ Waiting for pod to be ready... ($ATTEMPTS/30)"
+                sleep 5
+              done
+
+              POD=$(kubectl get pods -n githubservices -l app=atarnet-homelab -o jsonpath="{.items[0].metadata.name}")
+              echo "✅ Pod is ready: $POD"
+              echo "📜 Fetching logs..."
+              kubectl logs $POD -n githubservices || true
+            '''
+          }
         }
       }
     }
