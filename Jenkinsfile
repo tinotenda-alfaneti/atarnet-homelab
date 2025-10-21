@@ -66,12 +66,6 @@ pipeline {
       }
     }
 
-    stage('Debug Workspace') {
-      steps {
-        sh 'ls -R $WORKSPACE'
-      }
-    }
-
     stage('Build & Push with Kaniko') {
       steps {
         withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
@@ -79,10 +73,11 @@ pipeline {
             sh '''
               export KUBECONFIG=$KUBECONFIG_FILE
               echo "🚀 Launching Kaniko Job..."
-              $WORKSPACE/bin/kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
-              $WORKSPACE/bin/kubectl apply -f $WORKSPACE/k8s/kaniko.yaml -n githubservices
-              $WORKSPACE/bin/kubectl wait --for=condition=complete job/kaniko-job -n githubservices --timeout=10m
-              $WORKSPACE/bin/kubectl logs job/kaniko-job -n githubservices
+              $WORKSPACE/bin/kubectl create namespace test-ns --dry-run=client -o yaml | kubectl apply -f -
+              $WORKSPACE/bin/kubectl delete job kaniko-job -n test-ns --ignore-not-found=true
+              $WORKSPACE/bin/kubectl apply -f $WORKSPACE/k8s/kaniko.yaml -n test-ns
+              $WORKSPACE/bin/kubectl wait --for=condition=complete job/kaniko-job -n test-ns --timeout=10m
+              $WORKSPACE/bin/kubectl logs job/kaniko-job -n test-ns
             '''
           }
         }
@@ -96,12 +91,12 @@ pipeline {
             sh '''
               export KUBECONFIG=$KUBECONFIG_FILE
               echo "🔍 Launching Trivy scan job in Kubernetes..."
-              $WORKSPACE/bin/kubectl delete job trivy-scan -n githubservices --ignore-not-found=true
+              $WORKSPACE/bin/kubectl delete job trivy-scan -n test-ns --ignore-not-found=true
               sed "s|tinorodney/atarnet-homelab:latest|${IMAGE_NAME}:${TAG}|g" \
-                $WORKSPACE/k8s/trivy.yaml | $WORKSPACE/bin/kubectl apply -f - -n githubservices
-              $WORKSPACE/bin/kubectl wait --for=condition=complete job/trivy-scan -n githubservices --timeout=5m || true
+                $WORKSPACE/k8s/trivy.yaml | $WORKSPACE/bin/kubectl apply -f - -n test-ns
+              $WORKSPACE/bin/kubectl wait --for=condition=complete job/trivy-scan -n test-ns --timeout=5m || true
               echo "Trivy scan logs:"
-              $WORKSPACE/bin/kubectl logs job/trivy-scan -n githubservices || true
+              $WORKSPACE/bin/kubectl logs job/trivy-scan -n test-ns || true
             '''
           }
         }
@@ -115,7 +110,7 @@ pipeline {
             export KUBECONFIG=$KUBECONFIG_FILE
             echo "⚙️ Deploying with Helm..."
             $WORKSPACE/bin/helm upgrade --install atarnet-homelab $WORKSPACE/charts/atarnet-homelab \
-              --namespace githubservices \
+              --namespace test-ns \
               --create-namespace \
               --set image.repository=${IMAGE_NAME} \
               --set image.tag=${TAG}
@@ -134,21 +129,21 @@ pipeline {
 
               # Wait for pod readiness
               ATTEMPTS=0
-              until kubectl get pods -n githubservices -l app=atarnet-homelab -o jsonpath="{.items[0].status.phase}" | grep -qE 'Running|Succeeded'; do
+              until kubectl get pods -n test-ns -l app=atarnet-homelab -o jsonpath="{.items[0].status.phase}" | grep -qE 'Running|Succeeded'; do
                 ATTEMPTS=$((ATTEMPTS+1))
                 if [ $ATTEMPTS -gt 30 ]; then
                   echo "❌ Pod did not reach running state in time."
-                  kubectl get pods -n githubservices -l app=atarnet-homelab
+                  kubectl get pods -n test-ns -l app=atarnet-homelab
                   exit 1
                 fi
                 echo "⏳ Waiting for pod to be ready... ($ATTEMPTS/30)"
                 sleep 5
               done
 
-              POD=$(kubectl get pods -n githubservices -l app=atarnet-homelab -o jsonpath="{.items[0].metadata.name}")
+              POD=$(kubectl get pods -n test-ns -l app=atarnet-homelab -o jsonpath="{.items[0].metadata.name}")
               echo "✅ Pod is ready: $POD"
               echo "📜 Fetching logs..."
-              kubectl logs $POD -n githubservices || true
+              kubectl logs $POD -n test-ns || true
             '''
           }
         }
@@ -168,8 +163,8 @@ pipeline {
             withCredentials([file(credentialsId: "${KUBECONFIG_CRED}", variable: 'KUBECONFIG_FILE')]) {
               sh '''
                 export KUBECONFIG=$KUBECONFIG_FILE
-                kubectl delete job kaniko-job -n githubservices --ignore-not-found=true
-                kubectl delete job trivy-scan -n githubservices --ignore-not-found=true
+                kubectl delete job kaniko-job -n test-ns --ignore-not-found=true
+                kubectl delete job trivy-scan -n test-ns --ignore-not-found=true
                 echo "✅ Kubernetes jobs cleaned up."
               '''
             }
